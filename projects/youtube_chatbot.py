@@ -1,9 +1,13 @@
 from langchain_community.document_loaders import YoutubeLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings,HuggingFaceEndpoint,ChatHuggingFace
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_classic.storage import LocalFileStore
 from langchain_classic.embeddings import CacheBackedEmbeddings
+from langchain_core.prompts import PromptTemplate
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 url='https://youtu.be/Gfr50f6ZBvo?si=jrmFbfrL35zV5Wdl'
@@ -31,7 +35,7 @@ print(len(texts))
 
 
 #Another way of creating embeddings
-query="Give me the summary of the vedio"
+question="Did they talk about aliens,if yes what?"
 underlying_embeddings = HuggingFaceEmbeddings()
 
 
@@ -54,7 +58,36 @@ retriever = vectorstore.as_retriever(
     search_kwargs={"k":4}
 )
 
-retriever.invoke(query)
+results = retriever.invoke(question)
 
-# results = vectorstore.similarity_search(query)
-# vector = cached_embedder.embed_query(query)
+# print(results)
+
+
+
+prompt=PromptTemplate(
+    template="""
+    You are a very helpful assistant.
+    Answer from only the provided transcript context.
+    If the context is insuffucient,just say you don't know.
+    {context} 
+    Question: {question}
+    """,
+    input_varaibles = ['context','question']
+)
+
+
+
+llm = HuggingFaceEndpoint(
+    repo_id="meta-llama/Llama-3.1-8B-Instruct",
+    task="text-generation"
+)
+model = ChatHuggingFace(llm=llm)
+
+
+
+
+context_text = "\n\n".join(doc.page_content for doc in results)
+final_prompt = prompt.invoke({"context":context_text,"question":question})
+
+answer = model.invoke(final_prompt)
+print(answer.content)
