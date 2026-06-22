@@ -35,7 +35,7 @@ print(len(texts))
 
 
 #Another way of creating embeddings
-question="Did they talk about aliens,if yes what?"
+# question="Did they talk about aliens,if yes what?"
 underlying_embeddings = HuggingFaceEmbeddings()
 
 
@@ -58,7 +58,7 @@ retriever = vectorstore.as_retriever(
     search_kwargs={"k":4}
 )
 
-results = retriever.invoke(question)
+# results = retriever.invoke(question)
 
 # print(results)
 
@@ -86,8 +86,34 @@ model = ChatHuggingFace(llm=llm)
 
 
 
-context_text = "\n\n".join(doc.page_content for doc in results)
-final_prompt = prompt.invoke({"context":context_text,"question":question})
+# context_text = "\n\n".join(doc.page_content for doc in results)
+# final_prompt = prompt.invoke({"context":context_text,"question":question})
 
-answer = model.invoke(final_prompt)
-print(answer.content)
+# answer = model.invoke(final_prompt)
+# print(answer.content)
+
+
+
+
+
+""" USING CHAINS """
+
+from langchain_core.runnables import RunnableParallel , RunnablePassthrough , RunnableLambda
+from langchain_core.output_parsers import StrOutputParser
+
+
+def format_document(results):
+    context_text = "\n\n".join(doc.page_content for doc in results)
+    return context_text
+
+
+parallel_chain = RunnableParallel({
+    "context": retriever | RunnableLambda(format_document),
+    "question" : RunnablePassthrough()
+})
+
+parser = StrOutputParser()
+
+main_chain = parallel_chain | prompt | model | parser
+answer = main_chain.invoke("Can you summarize the vedio")
+print(answer)
